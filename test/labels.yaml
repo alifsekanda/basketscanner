@@ -1,0 +1,14 @@
+# What is really in each test photo, for compare_methods.py.
+# Use the database folder names. Repeat a name when a photo holds two of the same item, and write
+# unknown for an item that is not in the database. Photo paths are relative to this file.
+"test_image.jpg": [eclipse, charger, pen]
+"Screenshot 2026-10-04 231551.png": [loctite_243]
+"Screenshot 2026-10-04 231603.png": [loctite_243]
+"Screenshot 2026-10-04 231603 - Copy.png": [loctite_243]
+"Screenshot 2026-10-04 232129.png": [loctite_2701]
+"Screenshot 2026-10-04 232206.png": [loctite_2701]
+"WhatsApp Image 2026-10-09 at 3.50.53 PM (1).jpeg": [aa_battery]
+"WhatsApp Image 2026-10-09 at 3.50.53 PM (2).jpeg": [aa_battery]
+"WhatsApp Image 2026-10-09 at 3.51.03 PM.jpeg": [aaa_battery]
+"WhatsApp Image 2026-10-09 at 3.51.06 PM.jpeg": [aaa_battery]
+"WhatsApp Image 2026-10-09 at 4.54.55 PM.jpeg": [aa_battery, aaa_battery]

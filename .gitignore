@@ -1,0 +1,15 @@
+# Python environment and caches (recreate with requirements.txt)
+.venv/
+__pycache__/
+*.pyc
+
+# Downloaded models, ~60 GB (re-download with: python download_models.py)
+models/
+
+# Generated: indexes are rebuilt by build_db.py or the app, outputs by running photos again
+index/
+outputs/
+
+# Image databases: kept on disk only, not stored in git
+db/
+db2/

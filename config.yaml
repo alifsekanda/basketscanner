@@ -1,0 +1,74 @@
+device: cuda
+
+paths:                  # relative paths are relative to this config file
+  db_dir: db2         # db/<ItemName>/*.jpg  (folder name = item label)
+  index_dir: index      # written by build_db.py
+  out_dir: outputs
+
+fastsam:
+  model_id: FastSAM-s.pt
+  imgsz: 1024
+  conf: 0.4
+  iou: 0.9
+  max_det: 300
+
+filter:
+  min_area_frac: 0.003      # drop masks smaller than 0.3% of the image
+  max_area_frac: 0.40       # drop masks larger than 40% (basket / background)
+  max_bbox_frac: 0.60       # drop masks whose bbox covers > 60% (basket rim, background rings)
+  containment_thresh: 0.85  # drop a mask if >= 85% of it lies inside a larger kept mask
+  bbox_pad_frac: 0.10       # padding around the bbox crop shown to the VLM
+
+embed:
+  model_id: facebook/dinov2-base
+  batch_size: 32
+
+retrieval:
+  top_k: 5       # distinct candidate items passed to the VLM
+
+vlm:
+  model_id: Qwen/Qwen2.5-VL-7B-Instruct
+  max_pixels: 200704   # 448*448 per image
+  max_new_tokens: 128
+
+# Choices offered in the app; download them with: python download_models.py
+# The model_id values above are the defaults the app and run.py start with.
+models:
+  fastsam:
+    - FastSAM-s.pt
+  embed:
+    - facebook/dinov2-small
+    - facebook/dinov2-base
+    - facebook/dinov2-large
+    - facebook/dinov2-giant
+  vlm:
+    - Qwen/Qwen2.5-VL-3B-Instruct
+    - Qwen/Qwen2.5-VL-7B-Instruct
+    - Qwen/Qwen3-VL-2B-Instruct
+    - Qwen/Qwen3-VL-4B-Instruct
+    - Qwen/Qwen3-VL-8B-Instruct
+  siglip:
+    - google/siglip-base-patch16-224
+    - google/siglip-so400m-patch14-384
+    - google/siglip2-base-patch16-224
+    - google/siglip2-large-patch16-384
+    - google/siglip2-so400m-patch14-384
+    - google/siglip2-giant-opt-patch16-384
+
+# SigLIP method (no VLM): crops are matched against the database photos (image) and the
+# product names (text); the best combined score wins.
+siglip:
+  model_id: google/siglip2-so400m-patch14-384
+  top_k: 10          # closest products by image, re-scored with their names
+  text_weight: 0.3   # share of the name (text) match in the final score
+  min_score: 0.5     # starting "Minimum confidence" for this method (below = unknown)
+
+# Battery size from the photo (needs a fixed, calibrated camera). When an item is identified as one
+# of the batteries below, its measured diameter picks the size, overriding the VLM.
+battery_size:
+  micron_per_pixel: null   # camera scale at the basket floor, full-resolution photos (e.g. 200); null = off
+  tolerance_mm: 1.5        # diameter further than this from every size -> unknown (shadow or bad mask)
+  diameters_mm:            # database item name -> standard diameter
+    aaa_battery: 10.5
+    aa_battery: 14.5
+    a_battery: 17.0

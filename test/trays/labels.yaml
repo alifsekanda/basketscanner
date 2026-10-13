@@ -1,0 +1,6 @@
+# Simulated trays: items cut out of the photos in test/ and placed on one plain grey tray
+# (tray 1: spaced out; tray 2: any angle, two of some items; tray 3: crowded, some items touching).
+# Same format as test/labels.yaml, for: python compare_methods.py --labels test/trays/labels.yaml
+"tray_1.jpg": [aa_battery, aaa_battery, charger, eclipse, loctite_243, loctite_2701, pen]
+"tray_2.jpg": [aa_battery, aa_battery, aaa_battery, aaa_battery, loctite_243, loctite_243, loctite_2701, pen]
+"tray_3.jpg": [aa_battery, aa_battery, aaa_battery, aaa_battery, charger, eclipse, loctite_243, loctite_2701, pen]

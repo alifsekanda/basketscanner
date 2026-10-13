@@ -1,0 +1,16 @@
+# Python 3.10 venv:  py -3.10 -m venv .venv
+# Install torch first:
+#   pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu121
+ultralytics>=8.3,<9
+transformers>=4.56,<5   # >=4.56 for from_pretrained(dtype=...); 5.x needs torch newer than 2.5.1
+accelerate
+qwen-vl-utils
+faiss-cpu
+opencv-python
+pillow
+pyyaml
+numpy
+huggingface_hub
+gradio==6.17.3   # app.py UI; newer versions conflict with the transformers 4.x stack above
+sentencepiece    # tokenizer of the original SigLIP models (with protobuf)
+protobuf
