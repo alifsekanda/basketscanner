@@ -34,22 +34,22 @@ paths, device = cfg["paths"], cfg["device"]
 # One card per method on the home page, in this order.
 METHODS = {
     "siglip": {
-        "name": "SigLIP", "kinds": ("fastsam", "siglip"), "recommended": True,
-        "steps": "FastSAM → SigLIP image and name match",
-        "about": "Matches each item against your product photos and product names. Fast and light, with no "
-                 "vision-language model needed.",
-        "facts": (("Segmentation", "FastSAM-s"), ("Matching", "Image + name"), ("Training", "Not needed")),
+        "name": "SigLIP", "kinds": ("sam2", "siglip"), "recommended": True,
+        "steps": "SAM2 → SigLIP image and name match",
+        "about": "Matches each item against your product photos and product names. Fast and light, and it "
+                 "named the most items correctly in our test.",
+        "facts": (("Per photo", "1.9 s"), ("GPU memory", "5.2 GB"), ("Items right", "13 of 14")),
     },
     "dino_qwen": {
-        "name": "DINOv2 + Qwen", "kinds": ("fastsam", "embed", "vlm"), "recommended": False,
-        "steps": "FastSAM → DINOv2 shortlist → Qwen VLM",
+        "name": "DINOv2 + Qwen", "kinds": ("sam2", "embed", "vlm"), "recommended": False,
+        "steps": "SAM2 → DINOv2 shortlist → Qwen VLM",
         "about": "DINOv2 shortlists the 5 closest products, then the Qwen vision-language model picks one "
                  "or answers unknown. Slower, and needs a 24 GB GPU.",
-        "facts": (("Segmentation", "FastSAM-s"), ("Matching", "DINOv2 + Qwen"), ("Training", "Not needed")),
+        "facts": (("Per photo", "5.5 s"), ("GPU memory", "18.9 GB"), ("Items right", "11 of 14")),
     },
 }
 LOADERS = {
-    "fastsam": lambda model_id: Segmenter({**cfg["fastsam"], "model_id": model_id}, device=device),
+    "sam2": lambda model_id: Segmenter({**cfg["sam2"], "model_id": model_id}, device=device),
     "embed": lambda model_id: Embedder(model_id, device=device),
     "vlm": lambda model_id: ItemRecognizer(model_id, max_pixels=cfg["vlm"]["max_pixels"],
                                            max_new_tokens=cfg["vlm"]["max_new_tokens"], device=device),
@@ -242,21 +242,21 @@ def items_html(results, out_dir):
     return f'<div class="bs-items">{"".join(rows)}</div>'
 
 
-def identify(photo, method, use_vlm, segmenter_id, search_id, vlm_id, min_confidence, progress=None):
+def identify(photo, method, use_vlm, sam_id, search_id, vlm_id, min_confidence, progress=None):
     if photo is None:
         raise gr.Error("Add a basket photo first.")
     t = time.perf_counter()
     loading = (lambda m: progress(0, desc=f"Loading {short(m)} ...")) if progress is not None else None
-    segmenter = get_model("fastsam", segmenter_id, loading)
+    segmenter = get_model("sam2", sam_id, loading)
     embedder = get_model(search_kind(search_id), search_id, loading)
     if method == "siglip":
         recognizer = SiglipMatcher(embedder, cfg["siglip"]["text_weight"])
         run_cfg = {**cfg, "retrieval": {**cfg["retrieval"], "top_k": cfg["siglip"]["top_k"]}}
-        models = [segmenter_id, search_id]
+        models = [sam_id, search_id]
     else:
         recognizer = get_model("vlm", vlm_id, loading) if use_vlm else None
         run_cfg = cfg
-        models = [segmenter_id, search_id] + ([vlm_id] if use_vlm else [])
+        models = [sam_id, search_id] + ([vlm_id] if use_vlm else [])
     # Build the index on the first use of a search model, and rebuild it when photos were added or removed:
     # an index without the new photos would silently never find those products
     index = load_index(search_id)
@@ -327,11 +327,11 @@ def start_handler(method):
     """The Start button's handler for one method. Gradio only passes the progress tracker to a named
     parameter (not one after *args), so the handler lists the page's model dropdowns one by one."""
     if len(METHODS[method]["kinds"]) == 2:
-        def handler(segmenter_id, search_id, progress=gr.Progress()):
-            return start(method, (segmenter_id, search_id), progress)
+        def handler(sam_id, search_id, progress=gr.Progress()):
+            return start(method, (sam_id, search_id), progress)
     else:
-        def handler(segmenter_id, search_id, vlm_id, progress=gr.Progress()):
-            return start(method, (segmenter_id, search_id, vlm_id), progress)
+        def handler(sam_id, search_id, vlm_id, progress=gr.Progress()):
+            return start(method, (sam_id, search_id, vlm_id), progress)
     return handler
 
 
@@ -386,7 +386,7 @@ def build_page(method):
                         info="Slower, but checks each match and can answer 'unknown'. "
                              "Off: closest search match only.")
                     with gr.Accordion("Models", open=False):
-                        segmenter_dd = gr.Dropdown(model_choices("fastsam"), value=cfg["fastsam"]["model_id"],
+                        sam_dd = gr.Dropdown(model_choices("sam2"), value=cfg["sam2"]["model_id"],
                                              label="Segmentation model")
                         search_dd = gr.Dropdown(model_choices(search), value=cfg[search]["model_id"],
                                                 label=search_label)
@@ -410,13 +410,13 @@ def build_page(method):
     # Identify and Rebuild use the GPU and swap models and indexes, so they share one queue with Start
     # (progress=gr.Progress() lets Gradio show which model is loading while you wait)
     if siglip:
-        def run(photo, segmenter_id, search_id, min_confidence, progress=gr.Progress()):
-            return identify(photo, method, False, segmenter_id, search_id, None, min_confidence, progress)
-        inputs = [photo, segmenter_dd, search_dd, min_conf]
+        def run(photo, sam_id, search_id, min_confidence, progress=gr.Progress()):
+            return identify(photo, method, False, sam_id, search_id, None, min_confidence, progress)
+        inputs = [photo, sam_dd, search_dd, min_conf]
     else:
-        def run(photo, use_vlm, segmenter_id, search_id, vlm_id, min_confidence, progress=gr.Progress()):
-            return identify(photo, method, use_vlm, segmenter_id, search_id, vlm_id, min_confidence, progress)
-        inputs = [photo, use_vlm, segmenter_dd, search_dd, vlm_dd, min_conf]
+        def run(photo, use_vlm, sam_id, search_id, vlm_id, min_confidence, progress=gr.Progress()):
+            return identify(photo, method, use_vlm, sam_id, search_id, vlm_id, min_confidence, progress)
+        inputs = [photo, use_vlm, sam_dd, search_dd, vlm_dd, min_conf]
     run_btn.click(run, inputs, [annotated, summary, item_list], concurrency_id="gpu",
                   api_name=f"identify_{method}")
     rebuild_btn.click(rebuild, [db_dd], [status, db_items, report], concurrency_id="gpu",
@@ -426,7 +426,7 @@ def build_page(method):
     db_dd.input(lambda m: m, db_dd, search_dd)
     db_dd.change(db_overview, [db_dd], [status, db_items])
     db_tab.select(db_overview, [db_dd], [status, db_items])  # Identify may have rebuilt the index meanwhile
-    return page, home_btn, [dd for dd in (segmenter_dd, search_dd, vlm_dd) if dd is not None], db_dd, status, db_items
+    return page, home_btn, [dd for dd in (sam_dd, search_dd, vlm_dd) if dd is not None], db_dd, status, db_items
 
 
 with gr.Blocks(title="Basket Scanner", analytics_enabled=False) as demo:

@@ -86,7 +86,7 @@ def main():
         ap.error(f"not database folder names: {', '.join(typos)}")
     n_items = sum(len(items) for items in photos.values())
 
-    segmenter = Segmenter(cfg["fastsam"], device=cfg["device"])
+    segmenter = Segmenter(cfg["sam2"], device=cfg["device"])
     out_root = Path(cfg["paths"]["out_dir"]) / "compare"
     rows, mistakes = [], []
     for method, name in METHODS.items():
@@ -114,8 +114,8 @@ def main():
         gc.collect()
         torch.cuda.empty_cache()
 
-    models = {key: cfg[key]["model_id"].split("/")[-1] for key in ("fastsam", "embed", "vlm", "siglip")}
-    print(f"\n=== {len(photos)} photos, {n_items} items. FastSAM: {models['fastsam']}; "
+    models = {key: cfg[key]["model_id"].split("/")[-1] for key in ("sam2", "embed", "vlm", "siglip")}
+    print(f"\n=== {len(photos)} photos, {n_items} items. SAM2: {models['sam2']}; "
           f"DINOv2 + Qwen: {models['embed']} + {models['vlm']}; SigLIP: {models['siglip']}")
     print(f"{'':<15}{'Found right':<14}{'Wrong/extra':<13}{'Photos fully right':<20}{'Median time':<13}Peak GPU")
     for name, correct, wrong, perfect, secs, gb in rows:

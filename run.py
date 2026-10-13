@@ -149,7 +149,7 @@ def process_image(img_path, out_dir, cfg, segmenter, embedder, index, recognizer
 
         res = {"id": i, "bbox": list(it.bbox), "item": decision["item"],
                "confidence": decision["confidence"], "reason": decision["reason"],
-               "vlm_raw": decision["raw"], "segmentation_score": it.score, "candidates": candidates,
+               "vlm_raw": decision["raw"], "sam_score": it.score, "candidates": candidates,
                "size_mm": [round(v, 1) for v in size_mm] if size_mm else None}
         results.append(res)
         print(f"  [{i:02d}] {res['item'] or 'unknown':<25} conf={res['confidence']}  "
@@ -187,8 +187,8 @@ def main():
     print("Loading DINOv2 + index...")
     index = ItemIndex(index_dir_for(cfg["paths"]["index_dir"], cfg["embed"]["model_id"]), cfg["paths"]["db_dir"])
     embedder = Embedder(cfg["embed"]["model_id"], device=device)
-    print("Loading FastSAM...")
-    segmenter = Segmenter(cfg["fastsam"], device=device)
+    print("Loading SAM2...")
+    segmenter = Segmenter(cfg["sam2"], device=device)
 
     recognizer = None
     if not args.no_vlm:

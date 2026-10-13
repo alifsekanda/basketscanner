@@ -5,12 +5,15 @@ paths:                  # relative paths are relative to this config file
   index_dir: index      # written by build_db.py
   out_dir: outputs
 
-fastsam:
-  model_id: FastSAM-s.pt
-  imgsz: 1024
-  conf: 0.4
-  iou: 0.9
-  max_det: 300
+sam2:
+  model_id: facebook/sam2.1-hiera-large
+  # SAM2AutomaticMaskGenerator params
+  points_per_side: 32
+  points_per_batch: 64
+  pred_iou_thresh: 0.88
+  stability_score_thresh: 0.9
+  box_nms_thresh: 0.7
+  min_mask_region_area: 100
 
 filter:
   min_area_frac: 0.003      # drop masks smaller than 0.3% of the image
@@ -34,8 +37,11 @@ vlm:
 # Choices offered in the app; download them with: python download_models.py
 # The model_id values above are the defaults the app and run.py start with.
 models:
-  fastsam:
-    - FastSAM-s.pt
+  sam2:
+    - facebook/sam2.1-hiera-tiny
+    - facebook/sam2.1-hiera-small
+    - facebook/sam2.1-hiera-base-plus
+    - facebook/sam2.1-hiera-large
   embed:
     - facebook/dinov2-small
     - facebook/dinov2-base

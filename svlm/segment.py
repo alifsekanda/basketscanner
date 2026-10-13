@@ -1,8 +1,10 @@
-"""FastSAM automatic segmentation, mask filtering and item cropping."""
+"""SAM2 automatic segmentation, mask filtering and item cropping."""
 from dataclasses import dataclass
-from pathlib import Path
 
 import numpy as np
+import torch
+from sam2.automatic_mask_generator import SAM2AutomaticMaskGenerator
+from sam2.build_sam import build_sam2_hf
 
 
 @dataclass
@@ -11,77 +13,32 @@ class ItemCrop:
     bbox: tuple               # (x0, y0, x1, y1) tight bbox, pixels
     bbox_crop: np.ndarray     # padded bbox crop (RGB), shown to the VLM
     masked_crop: np.ndarray   # tight crop with background set to white, used for embedding
-    score: float              # FastSAM detection confidence
+    score: float              # SAM2 predicted IoU
 
 
 class Segmenter:
     def __init__(self, cfg, device="cuda"):
+        sam_cfg = dict(cfg)
+        model_id = sam_cfg.pop("model_id")
         self.device = device
-        self.imgsz = cfg["imgsz"]
-        self.conf = cfg["conf"]
-        self.iou = cfg["iou"]
-        self.max_det = cfg["max_det"]
+        self.model = build_sam2_hf(model_id, device=device)
+        self.generator = SAM2AutomaticMaskGenerator(self.model, **sam_cfg)
 
-        model_id = cfg["model_id"]
-        model_path = Path(model_id)
-        if not model_path.is_file():
-            model_path = Path(__file__).resolve().parent.parent / "models" / "fastsam" / model_id
-        if not model_path.is_file():
-            raise FileNotFoundError(
-                f"FastSAM weights not found: {model_id}. Run `python download_models.py` first.")
-
-        from ultralytics import FastSAM
-
-        self.model = FastSAM(str(model_path))
-
+    @torch.inference_mode()
     def generate(self, image):
-        """image: HxWx3 uint8 RGB. Returns masks in the shared SAM-style format."""
-        device = self.device
-        if device == "cuda":
-            device = "0"
-        elif device.startswith("cuda:"):
-            device = device.split(":", 1)[1]
-
-        results = self.model.predict(
-            source=image[:, :, ::-1].copy(),
-            device=device,
-            imgsz=self.imgsz,
-            conf=self.conf,
-            iou=self.iou,
-            max_det=self.max_det,
-            retina_masks=True,
-            verbose=False,
-        )
-        if not results or results[0].masks is None:
-            return []
-
-        result = results[0]
-        masks = result.masks.data.cpu().numpy()
-        scores = (result.boxes.conf.cpu().numpy() if result.boxes is not None
-                  else np.ones(len(masks), dtype=np.float32))
-        generated = []
-        for mask, score in zip(masks, scores):
-            segmentation = mask.astype(bool)
-            ys, xs = np.nonzero(segmentation)
-            if not len(xs):
-                continue
-            x0, x1 = int(xs.min()), int(xs.max()) + 1
-            y0, y1 = int(ys.min()), int(ys.max()) + 1
-            generated.append({
-                "segmentation": segmentation,
-                "bbox": [x0, y0, x1 - x0, y1 - y0],
-                "area": int(segmentation.sum()),
-                "predicted_iou": float(score),
-            })
-        return generated
+        """image: HxWx3 uint8 RGB. Returns SAM2 raw mask dicts."""
+        if self.device.startswith("cuda"):
+            with torch.autocast("cuda", dtype=torch.bfloat16):
+                return self.generator.generate(image)
+        return self.generator.generate(image)
 
 
 def _overlap(a, b):
-    """Pixels shared by two masks, counted only inside their half-open bbox intersection."""
+    """Pixels shared by two SAM2 masks, counted only inside their bbox intersection."""
     ax, ay, aw, ah = (int(v) for v in a["bbox"])
     bx, by, bw, bh = (int(v) for v in b["bbox"])
     x0, y0 = max(ax, bx), max(ay, by)
-    x1, y1 = min(ax + aw, bx + bw), min(ay + ah, by + bh)
+    x1, y1 = min(ax + aw, bx + bw) + 1, min(ay + ah, by + bh) + 1  # +1: bbox edges are inclusive
     if x0 >= x1 or y0 >= y1:
         return 0
     return np.logical_and(a["segmentation"][y0:y1, x0:x1], b["segmentation"][y0:y1, x0:x1]).sum()
